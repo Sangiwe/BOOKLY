@@ -3,6 +3,7 @@ from .models import Book
 from .serializers import BookSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db.models import Q
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -16,8 +17,21 @@ class BookViewSet(viewsets.ModelViewSet):
     permission_classes = [IsOwnerOrReadOnly]
     
     def get_queryset(self):
-        # only return user's books (or modify to return all if desired)
-        return Book.objects.filter(owner=self.request.user)
+        queryset = Book.objects.filter(owner=self.request.user)
+
+        status_param = self.request.query_params.get('status')
+        search_param = self.request.query_params.get('search')
+
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        if search_param:
+            queryset = queryset.filter(
+                Q(title__icontains=search_param) |
+                Q(author__icontains=search_param)
+            )
+
+        return queryset
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
